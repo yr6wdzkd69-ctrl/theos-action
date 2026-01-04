@@ -1,13 +1,22 @@
 #import <Foundation/Foundation.h>
 
-// --- Weapon Hack (No Recoil/Spread) ---
-%hook className
-- (bool)isFalse {
-    return true; 
+// --- Only Radar / ESP Features ---
+
+%hook NSBundle
+- (id)objectForInfoDictionaryKey:(NSString *)key {
+    if ([key isEqualToString:@"SignerIdentity"]) return nil;
+    return %orig;
 }
 %end
 
-// --- ESP Radar (Wallhack Essentials) ---
+// MiniMap Radar (Always see enemies on map)
+%hook GameMapConfig
+- (bool)enemyAlwaysVisible {
+    return true;
+}
+%end
+
+// Visual Radar Essentials
 %hook EntityModel
 - (bool)isVisible {
     return true; 
@@ -16,16 +25,6 @@
 
 %hook EnemyPlayer
 - (bool)isDetected {
-    return true;
-}
-- (float)distanceToPlayer {
-    return %orig;
-}
-%end
-
-// --- MiniMap Radar ---
-%hook GameMapConfig
-- (bool)enemyAlwaysVisible {
     return true;
 }
 %end
