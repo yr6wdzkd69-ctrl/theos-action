@@ -1,14 +1,11 @@
 #import <Foundation/Foundation.h>
-#import <UIKit/UIKit.h>
 
-// Forced Injection Logic
-__attribute__((constructor))
-static void force_load() {
-    // This runs immediately when the dylib is loaded in memory
-}
-
+// --- Radar Features ---
 %hook GameMapConfig
 - (bool)enemyAlwaysVisible {
+    return true;
+}
+- (bool)isEnemyVisibleOnMap {
     return true;
 }
 %end
@@ -19,3 +16,24 @@ static void force_load() {
 }
 %end
 
+// --- Aimbot Features ---
+%hook PlayerWeaponControl
+- (bool)isAimbotEnabled {
+    return true;
+}
+- (float)getAimbotFov {
+    return 15.0f; 
+}
+- (float)getAimbotSmooth {
+    return 0.5f;
+}
+%end
+
+%hook PlayerFiredWeapon
+- (float)getSpreadConfig {
+    return 0.0f; 
+}
+- (float)getRecoilConfig {
+    return 0.0f;
+}
+%end
