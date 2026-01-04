@@ -6,7 +6,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-13
     steps:
       - uses: actions/checkout@v4
         with:
@@ -17,12 +17,11 @@ jobs:
 
       - name: Build Package
         run: |
+          export THEOS=$GITHUB_WORKSPACE/theos
           make package FINALPACKAGE=1
-        env:
-          THEOS: ${{ github.workspace }}/theos
-
+        
       - name: Upload dylib
         uses: actions/upload-artifact@v4
         with:
           name: my-dylib-file
-          path: .theos/obj/debug/*.dylib
+          path: "**/obj/**/*.dylib"
