@@ -1,0 +1,9 @@
+Package: com.yourname.codmmod
+Name: CODMMod
+Depends: mobilesubstrate
+Version: 0.0.1
+Architecture: iphoneos-arm
+Description: CODM Mod Menu
+Maintainer: YourName
+Author: YourName
+Section: Tweaks
