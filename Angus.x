@@ -1,16 +1,17 @@
 #import <Foundation/Foundation.h>
 
-// Safe construction to avoid disk write crashes
-%ctor {
-    @autoreleasepool {
-        // Silent loading
-    }
+%hook NSBundle
+- (id)objectForInfoDictionaryKey:(NSString *)key {
+    if ([key isEqualToString:@"SignerIdentity"]) return nil;
+    return %orig;
 }
+%end
 
-// Minimal bypass without interfering with system files
 %hook NSFileManager
 - (BOOL)fileExistsAtPath:(NSString *)path {
-    if ([path containsString:@"Cydia"] || [path containsString:@"Sileo"]) return NO;
+    if ([path containsString:@"Library/MobileSubstrate"]) return NO;
+    if ([path containsString:@"Cydia"]) return NO;
+    if ([path containsString:@"Sileo"]) return NO;
     return %orig;
 }
 %end
