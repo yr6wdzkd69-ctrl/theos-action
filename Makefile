@@ -5,7 +5,7 @@ FINALPACKAGE = 1
 
 include $(THEOS)/makefiles/common.mk
 
-TWEAK_NAME = CoreAppSetting
+TWEAK_NAME = CODMMod
 
 CoreAppSetting_FILES = Tweak.x Angus.x SecurityBypass.x
 CoreAppSetting_CFLAGS = -fobjc-arc
