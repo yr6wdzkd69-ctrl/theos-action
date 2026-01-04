@@ -1,29 +1,30 @@
 #import <UIKit/UIKit.h>
 
-// --- Initialization Check ---
-%ctor {
+__attribute__((constructor))
+static void init_mod() {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        UIWindow *keyWindow = nil;
+        UIWindow *window = nil;
         if (@available(iOS 13.0, *)) {
             for (UIWindowScene *scene in [UIApplication sharedApplication].connectedScenes) {
                 if (scene.activationState == UISceneActivationStateForegroundActive) {
-                    keyWindow = ((UIWindowScene *)scene).windows.firstObject;
+                    window = scene.windows.firstObject;
                     break;
                 }
             }
         } else {
-            keyWindow = [UIApplication sharedApplication].keyWindow;
+            window = [UIApplication sharedApplication].keyWindow;
         }
 
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Angus System" 
-                                                                       message:@"Mod Initialized Successfully" 
-                                                                preferredStyle:UIAlertControllerStyleAlert];
-        [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
-        [keyWindow.rootViewController presentViewController:alert animated:YES completion:nil];
+        if (window.rootViewController) {
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"System" 
+                                                                           message:@"Mod Active in Frameworks" 
+                                                                    preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+            [window.rootViewController presentViewController:alert animated:YES completion:nil];
+        }
     });
 }
 
-// --- Radar Features ---
 %hook GameMapConfig
 - (bool)enemyAlwaysVisible {
     return true;
@@ -33,11 +34,5 @@
 %hook EntityModel
 - (bool)isVisible {
     return true; 
-}
-%end
-
-%hook EnemyPlayer
-- (bool)isDetected {
-    return true;
 }
 %end
