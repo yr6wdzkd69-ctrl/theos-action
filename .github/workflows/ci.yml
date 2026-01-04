@@ -1,37 +1,28 @@
 name: CI
-
-on: 
+on:
   workflow_dispatch:
-
   push:
-  schedule:
-    - cron: '0 9 15 * *'
+    branches: [ "main", "patch-1" ]
 
 jobs:
-  build-logos:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [macos-latest,]
-
+  build:
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          repository: Randomblock1/FleetsBGone
           submodules: true
 
-      - name: Prepare Theos
-        uses: randomblock1/theos-action@main
+      - name: Setup Theos
+        uses: p0358/setup-theos@main
 
-      - name: Build package
+      - name: Build Package
         run: |
-          rm -f packages/*
           make package FINALPACKAGE=1
+        env:
+          THEOS: ${{ github.workspace }}/theos
 
-      - name: Upload package
+      - name: Upload dylib
         uses: actions/upload-artifact@v4
         with:
-          name: "Package built by ${{ matrix.os }}"
-          path: ${{ github.workspace }}/packages/*.deb
-
-  # TODO: Add a job to build an Orion tweak
+          name: my-dylib-file
+          path: .theos/obj/debug/*.dylib
