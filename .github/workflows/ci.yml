@@ -12,16 +12,15 @@ jobs:
         with:
           submodules: true
 
-      - name: Setup Theos
-        uses: p0358/setup-theos@main
+      - name: Prepare Theos
+        uses: Randomblock1/theos-action@v1
 
       - name: Build Package
         run: |
-          export THEOS=$GITHUB_WORKSPACE/theos
           make package FINALPACKAGE=1
         
-      - name: Upload dylib
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: my-dylib-file
-          path: "**/obj/**/*.dylib"
+          name: CODM-Tweak
+          path: "packages/*.deb"
