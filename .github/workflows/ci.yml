@@ -15,7 +15,7 @@ jobs:
         os: [macos-latest, ubuntu-latest]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           repository: Randomblock1/FleetsBGone
           submodules: true
@@ -29,7 +29,7 @@ jobs:
           make package FINALPACKAGE=1
 
       - name: Upload package
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: "Package built by ${{ matrix.os }}"
           path: ${{ github.workspace }}/packages/*.deb
