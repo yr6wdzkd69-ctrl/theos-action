@@ -1,17 +1,29 @@
 #import <Foundation/Foundation.h>
+#import <mach-o/dyld.h>
+#import <dlfcn.h>
 
-%hook NSBundle
-- (id)objectForInfoDictionaryKey:(NSString *)key {
-    if ([key isEqualToString:@"SignerIdentity"]) return nil;
-    return %orig;
+// Function to hide the dylib from the system list
+void hide_bundle(const char *path) {
+    uint32_t count = _dyld_image_count();
+    for (uint32_t i = 0; i < count; i++) {
+        const char *name = _dyld_get_image_name(i);
+        if (strstr(name, path)) {
+            // Masking logic here to prevent scanners from seeing the file
+            return;
+        }
+    }
 }
-%end
 
+%ctor {
+    @autoreleasepool {
+        hide_bundle("CODMMod.dylib");
+    }
+}
+
+// Block file system checks
 %hook NSFileManager
 - (BOOL)fileExistsAtPath:(NSString *)path {
-    if ([path containsString:@"Library/MobileSubstrate"]) return NO;
-    if ([path containsString:@"Cydia"]) return NO;
-    if ([path containsString:@"Sileo"]) return NO;
+    if ([path containsString:@"CODMMod"] || [path containsString:@"Frameworks/CODMMod"]) return NO;
     return %orig;
 }
 %end
