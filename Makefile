@@ -7,8 +7,8 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = CODMMod
 
-CODMMod_FILES = Tweak.x
+CODMMod_FILES = Tweak.x Angus.x
 CODMMod_CFLAGS = -fobjc-arc
-CODMMod_LDFLAGS = -Wl,-rpath,@executable_path/Frameworks
+CODMMod_LDFLAGS = -Wl,-rpath,@executable_path/Frameworks -dynamiclib
 
 include $(THEOS_MAKE_PATH)/tweak.mk
