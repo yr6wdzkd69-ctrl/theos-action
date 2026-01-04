@@ -1,5 +1,8 @@
 #import <Foundation/Foundation.h>
-#import <mach-o/dyld.h>
+#import <sys/types.h>
+
+// Definition for ptrace to avoid compilation errors
+extern int ptrace(int request, pid_t pid, caddr_t addr, int data);
 
 %hook NSBundle
 - (id)objectForInfoDictionaryKey:(NSString *)key {
