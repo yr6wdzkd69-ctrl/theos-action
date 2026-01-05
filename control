@@ -1,9 +1,9 @@
-Package: com.yourname.codmmod
-Name: CODMMod
+Package: com.yourname.shield
+Name: SystemShield
 Depends: mobilesubstrate
-Version: 0.0.1
+Version: 1.0
 Architecture: iphoneos-arm
-Description: CODM Mod Menu
-Maintainer: YourName
-Author: YourName
+Description: Device Fingerprint Protection
+Maintainer: Cloud
+Author: Cloud
 Section: Tweaks
