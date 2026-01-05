@@ -1,7 +1,5 @@
 {
     Filter = {
-        Bundles = (
-            "com.activision.callofdutymobile"
-        );
+        Classes = ( "UIApplication" );
     };
 }
