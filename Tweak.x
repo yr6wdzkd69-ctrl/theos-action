@@ -2,11 +2,12 @@
 
 %hook UIDevice
 - (NSUUID *)identifierForVendor {
-    return [[NSUUID alloc] initWithUUIDString:@"F911E1F8-A12B-334C-82FC-0C247A3E6E5F"];
+    return [[NSUUID alloc] initWithUUIDString:@"A1B2C3D4-E5F6-47A8-9B0C-1D2E3F4G5H6I"];
 }
 %end
 
 %ctor {
-    unsetenv("DYLD_INSERT_LIBRARIES");
+    @autoreleasepool {
+        unsetenv("DYLD_INSERT_LIBRARIES");
+    }
 }
-
