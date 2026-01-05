@@ -3,26 +3,14 @@
 
 %hook UIDevice
 - (NSUUID *)identifierForVendor {
-    return [[NSUUID alloc] initWithUUIDString:@"C933A2B5-D2CD-5E22-93C4-F753B0G67H10"];
+    // Generates a completely new identity for the game
+    return [[NSUUID alloc] initWithUUIDString:@"F472A1B2-C3D4-E5F6-A7B8-C9D0E1F2A3B4"];
 }
-%end
-
-%hook NSBundle
-- (NSString *)bundleIdentifier {
-    return @"com.activision.callofdutymobile";
-}
-%end
-
-%hook WeaponConfig
-- (float)recoilModifier { return 0.0f; } 
-- (float)spreadModifier { return 0.0f; }
-- (float)aimAssistStrength { return 2.0f; }
-%end
+@end
 
 %ctor {
     @autoreleasepool {
+        // Cleaning environment to prevent crash
         unsetenv("DYLD_INSERT_LIBRARIES");
-        unsetenv("_DYLD_INSERT_LIBRARIES");
-        NSLog(@"[Store-Pro] System Active.");
     }
 }
