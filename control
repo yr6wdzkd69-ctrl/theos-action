@@ -1,9 +1,9 @@
-Package: com.yourstore.shield
-Name: StoreShield Premium
-Depends: mobilesubstrate
+Package: com.reset.device
+Name: DeviceReset
+Depends: firmware (>= 14.0)
 Version: 1.0.0
 Architecture: iphoneos-arm
-Description: Premium Protection for CODM
-Maintainer: YourStore
-Author: YourStore
+Description: Native Spoofer
+Maintainer: Store
+Author: Store
 Section: Tweaks
