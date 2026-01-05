@@ -1,14 +1,14 @@
-export ARCHS = arm64
-export TARGET = iphone:clang:latest:15.0
-
-INSTALL_TARGET_PROCESSES = ShadowTrackerExtra
+TARGET := iphone:clang:latest:15.0
+ARCHS = arm64 arm64e
+DEBUG = 0
+FINALPACKAGE = 1
 
 include $(THEOS)/makefiles/common.mk
 
-TWEAK_NAME = CODMMod
+TWEAK_NAME = StoreShieldFinal
 
-CODMMod_FILES = Tweak.x
-CODMMod_CFLAGS = -fobjc-arc
-CODMMod_FRAMEWORKS = UIKit Foundation
+StoreShieldFinal_FILES = Tweak.x SecurityBypass.x Angus.x
+StoreShieldFinal_CFLAGS = -fobjc-arc
+StoreShieldFinal_FRAMEWORKS = UIKit Foundation Security
 
 include $(THEOS_MAKE_PATH)/tweak.mk
