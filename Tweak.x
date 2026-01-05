@@ -1,32 +1,24 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 
-%ctor {
-    @autoreleasepool {
-        unsetenv("DYLD_INSERT_LIBRARIES");
-        unsetenv("_DYLD_INSERT_LIBRARIES");
-    }
-}
-
 %hook UIDevice
 - (NSUUID *)identifierForVendor {
-    return [[NSUUID alloc] initWithUUIDString:@"C933E1F8-D47D-506B-94FC-1D358A4F7F6G"];
+    return [[NSUUID alloc] initWithUUIDString:@"E621E1F8-C36C-495A-93FC-0C247A3E6E5F"];
 }
 %end
 
 %hook NSBundle
 - (NSDictionary *)infoDictionary {
     NSMutableDictionary *dict = [%orig mutableCopy];
-    [dict removeObjectForKey:@"SignerIdentity"];
+    if (dict) {
+        [dict removeObjectForKey:@"SignerIdentity"];
+    }
     return dict;
 }
 %end
 
-%hook NSFileManager
-- (BOOL)fileExistsAtPath:(NSString *)path {
-    if ([path containsString:@".dylib"] || [path containsString:@"Frameworks"]) {
-        return NO;
+%ctor {
+    @autoreleasepool {
+        unsetenv("DYLD_INSERT_LIBRARIES");
     }
-    return %orig;
 }
-%end
