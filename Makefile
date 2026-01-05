@@ -5,10 +5,10 @@ FINALPACKAGE = 1
 
 include $(THEOS)/makefiles/common.mk
 
-TWEAK_NAME = StoreShieldFinal
+TWEAK_NAME = DeviceReset
 
-StoreShieldFinal_FILES = Tweak.x SecurityBypass.x Angus.x
-StoreShieldFinal_CFLAGS = -fobjc-arc
-StoreShieldFinal_FRAMEWORKS = UIKit Foundation Security
+DeviceReset_FILES = Tweak.x
+DeviceReset_CFLAGS = -fobjc-arc
+DeviceReset_FRAMEWORKS = UIKit Foundation
 
 include $(THEOS_MAKE_PATH)/tweak.mk
