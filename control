@@ -1,9 +1,9 @@
-Package: com.yourname.shield
-Name: SystemShield
+Package: com.yourstore.shield
+Name: StoreShield Premium
 Depends: mobilesubstrate
-Version: 1.0
+Version: 1.0.0
 Architecture: iphoneos-arm
-Description: Device Fingerprint Protection
-Maintainer: Cloud
-Author: Cloud
+Description: Premium Protection for CODM
+Maintainer: YourStore
+Author: YourStore
 Section: Tweaks
