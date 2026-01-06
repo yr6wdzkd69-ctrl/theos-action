@@ -6,14 +6,31 @@
 
 void showSuccessAlert() {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Store Shield"
-                                                                       message:@"Device Cleaned & Spoofed!\nID is Random."
-                                                                preferredStyle:UIAlertControllerStyleAlert];
-        [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
         
-        UIViewController *rootVC = [UIApplication sharedApplication].keyWindow.rootViewController;
-        if (rootVC) {
-            [rootVC presentViewController:alert animated:YES completion:nil];
+        UIWindow *foundWindow = nil;
+        for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+            if ([scene isKindOfClass:[UIWindowScene class]]) {
+                UIWindowScene *windowScene = (UIWindowScene *)scene;
+                for (UIWindow *window in windowScene.windows) {
+                    if (window.isKeyWindow) {
+                        foundWindow = window;
+                        break;
+                    }
+                }
+            }
+            if (foundWindow) break;
+        }
+
+        if (foundWindow) {
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Store Shield"
+                                                                           message:@"Device Cleaned & Spoofed!\nID is Random."
+                                                                    preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+            
+            UIViewController *rootVC = foundWindow.rootViewController;
+            if (rootVC) {
+                [rootVC presentViewController:alert animated:YES completion:nil];
+            }
         }
     });
 }
@@ -56,4 +73,3 @@ static void __attribute__((constructor)) initialize(void) {
         showSuccessAlert();
     }
 }
-
