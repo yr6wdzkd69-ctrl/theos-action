@@ -1,6 +1,7 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <Security/Security.h>
+#import <AdSupport/AdSupport.h>
 #import <objc/runtime.h>
 
 void wipeKeychain() {
@@ -15,8 +16,18 @@ void wipeKeychain() {
     }
 }
 
-NSUUID * newIdentifier(id self, SEL _cmd) {
-    return [[NSUUID alloc] initWithUUIDString:@"7A24F1B2-C3D4-E5F6-A7B8-C9D0E1F2A999"];
+void wipeUserDefaults() {
+    NSString *appDomain = [[NSBundle mainBundle] bundleIdentifier];
+    [[NSUserDefaults standardUserDefaults] removePersistentDomainForName:appDomain];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
+NSUUID * newIDFV(id self, SEL _cmd) {
+    return [[NSUUID alloc] initWithUUIDString:@"11223344-5566-7788-9900-AABBCCDDEEFF"];
+}
+
+NSUUID * newIDFA(id self, SEL _cmd) {
+    return [[NSUUID alloc] initWithUUIDString:@"FFEEDDCC-BBAA-0099-8877-665544332211"];
 }
 
 static void __attribute__((constructor)) initialize(void) {
@@ -24,13 +35,19 @@ static void __attribute__((constructor)) initialize(void) {
         unsetenv("DYLD_INSERT_LIBRARIES");
         
         wipeKeychain();
+        wipeUserDefaults();
         
-        Class cls = objc_getClass("UIDevice");
-        if (cls) {
-            Method m = class_getInstanceMethod(cls, @selector(identifierForVendor));
-            if (m) {
-                method_setImplementation(m, (IMP)newIdentifier);
-            }
+        Class devCls = objc_getClass("UIDevice");
+        if (devCls) {
+            Method m = class_getInstanceMethod(devCls, @selector(identifierForVendor));
+            if (m) method_setImplementation(m, (IMP)newIDFV);
+        }
+        
+        Class adCls = objc_getClass("ASIdentifierManager");
+        if (adCls) {
+            Method m = class_getInstanceMethod(adCls, @selector(advertisingIdentifier));
+            if (m) method_setImplementation(m, (IMP)newIDFA);
         }
     }
 }
+
