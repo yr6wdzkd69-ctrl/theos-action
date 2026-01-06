@@ -4,6 +4,20 @@
 #import <AdSupport/AdSupport.h>
 #import <objc/runtime.h>
 
+void showSuccessAlert() {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Store Shield"
+                                                                       message:@"Device Cleaned & Spoofed!\nID is Random."
+                                                                preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+        
+        UIViewController *rootVC = [UIApplication sharedApplication].keyWindow.rootViewController;
+        if (rootVC) {
+            [rootVC presentViewController:alert animated:YES completion:nil];
+        }
+    });
+}
+
 void wipeKeychain() {
     NSArray *secItemClasses = @[(__bridge id)kSecClassGenericPassword,
                                 (__bridge id)kSecClassInternetPassword,
@@ -16,18 +30,8 @@ void wipeKeychain() {
     }
 }
 
-void wipeUserDefaults() {
-    NSString *appDomain = [[NSBundle mainBundle] bundleIdentifier];
-    [[NSUserDefaults standardUserDefaults] removePersistentDomainForName:appDomain];
-    [[NSUserDefaults standardUserDefaults] synchronize];
-}
-
-NSUUID * newIDFV(id self, SEL _cmd) {
-    return [[NSUUID alloc] initWithUUIDString:@"11223344-5566-7788-9900-AABBCCDDEEFF"];
-}
-
-NSUUID * newIDFA(id self, SEL _cmd) {
-    return [[NSUUID alloc] initWithUUIDString:@"FFEEDDCC-BBAA-0099-8877-665544332211"];
+NSUUID * randomUUID(id self, SEL _cmd) {
+    return [NSUUID UUID];
 }
 
 static void __attribute__((constructor)) initialize(void) {
@@ -35,19 +39,21 @@ static void __attribute__((constructor)) initialize(void) {
         unsetenv("DYLD_INSERT_LIBRARIES");
         
         wipeKeychain();
-        wipeUserDefaults();
+        [[NSUserDefaults standardUserDefaults] removePersistentDomainForName:[[NSBundle mainBundle] bundleIdentifier]];
         
         Class devCls = objc_getClass("UIDevice");
         if (devCls) {
             Method m = class_getInstanceMethod(devCls, @selector(identifierForVendor));
-            if (m) method_setImplementation(m, (IMP)newIDFV);
+            if (m) method_setImplementation(m, (IMP)randomUUID);
         }
         
         Class adCls = objc_getClass("ASIdentifierManager");
         if (adCls) {
             Method m = class_getInstanceMethod(adCls, @selector(advertisingIdentifier));
-            if (m) method_setImplementation(m, (IMP)newIDFA);
+            if (m) method_setImplementation(m, (IMP)randomUUID);
         }
+        
+        showSuccessAlert();
     }
 }
 
