@@ -1,104 +1,145 @@
-#import <Foundation/Foundation.h>
-#import <UIKit/UIKit.h>
-#import <Security/Security.h>
-#import <AdSupport/AdSupport.h>
-#import <objc/runtime.h>
+using UnityEngine;
+using System.Collections;
 
-// 1. Generate Random UUID
-static NSUUID *fakeUUID = nil;
-NSUUID * getFakeUUID() {
-    if (!fakeUUID) {
-        fakeUUID = [NSUUID UUID];
+public class AIController : MonoBehaviour {
+
+    private Camera mainCamera;
+    private Animator animator;
+    private bool isDebugMode = true;
+    public Transform enemyTarget;
+
+    void Start () {
+        // Set camera and animator reference points
+        mainCamera = Camera.main;
+        animator = GetComponent<Animator>();
+        if (!animator) {
+            Debug.LogError("No Animator Component Found in the script.");
+            return;
+        }
+        // Enemy Target is set by default to player.
+        enemyTarget = Camera.main.transform.GetChild(0).FindObjectOfType(typeof(Transform)) as GameObject;
     }
-    return fakeUUID;
-}
 
-// 2. Alert System
-void showSuccessAlert() {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        UIWindow *foundWindow = nil;
-        for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
-            if ([scene isKindOfClass:[UIWindowScene class]]) {
-                UIWindowScene *windowScene = (UIWindowScene *)scene;
-                for (UIWindow *window in windowScene.windows) {
-                    if (window.isKeyWindow) {
-                        foundWindow = window;
-                        break;
-                    }
+    void Update() {
+        float maxDistance = Vector3.Distance(transform.position, enemyTarget.transform.position);
+        if (maxDistance > 1.0f)
+        {
+            transform.position = Vector3.MoveTowards(transform.position, enemyTarget.transform.position,
+                Time.deltaTime * 2.0f);                
+        }
+        else
+        {
+            transform.position = Camera.main.transform.GetFirstNearByPoint(transform.position, 1.0f);                  
+        }
+        if (!isDebugMode && !IsGizmoEnabled())
+        {
+            // disable gizmos when game is not in debug mode
+            Debug.DrawLine(transform.position, enemyTarget.transform.position, Color.red);
+        }
+        if (!isDebugMode && IsGizmoEnabled())
+        {
+            // enable gizmos when game is in debug mode
+            Debug.DrawLine(transform.position, enemyTarget.transform.position, Color.green);
+        }
+    }
+
+    void OnMouseDown()
+    {
+        isDebugMode = !isDebugMode; 
+    }
+
+    void OnPointerDragEnd()
+    (
+        Vector3 mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition),
+        Vector3 eyeSpacePos = mainCamera.transform.TransformPoint(mousePosition));
+        float distanceToObject = Vector3.DistBetween(Vector3.zero, eyeSpacePos, Vector3.Distance(Camera.main.transform.position, enemyTarget.transform.position));
+
+        if (distanceToObject <= 1.0f)
+        {
+            Destroy(gameObject);
+        }
+    )
+
+    void ToggleDebugMenu()
+    {
+        isDebugMode = !isDebugMode;
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
+            StartCoroutine(DrawDebugLines());
+        }
+    }
+
+    IEnumerator DrawDebugLines ()
+    {
+        while (true)
+        {
+            yield return new WaitForSeconds(0.5f);
+            if (isDebugMode)
+            {
+                Color red = Color.red;
+                Vector3 directionFromCamera = Camera.main.transform.InverseTransformDirection(new Vector3(eyeSpacePos.x, -1.0f, eyeSpacePos.z));
+                float angleDelta = Mathf.Abs(Mathf.Cos(directionFromCamera.xAxisAngle) * Mathf.PI / 180.0f);
+                int index = (int)Math.Round(angleDelta);
+                int yCount = (int)index;
+
+                for (int i = 0; i < yCount; ++i)
+                {
+                    float x = 0.0f;
+                    float y = 0.0f;
+                    float z = 0.0f;
+                    float radius = 1.0f;
+                    float colorFactor = 0.2 + 0.4 * i;
+                    float colorRed = Color.red * colorFactor;
+                    float redX = (Color.red * colorFactor) + 0.2;
+                    float redY = (Color.red * colorFactor) + 0.2;
+                    float redZ = (Color.red * colorFactor) + 0.2;
+
+                    Debug.DrawLine(new Vector3(redX, redY, redZ), new Vector3(x, y, z), Color.blue);
                 }
-            }
-            if (foundWindow) break;
-        }
-        if (foundWindow) {
-            NSString *msg = [NSString stringWithFormat:@"Everything Cleaned.\nNew ID: ...%@", [[getFakeUUID() UUIDString] substringFromIndex:24]];
-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Device Reset Complete"
-                                                                           message:msg
-                                                                    preferredStyle:UIAlertControllerStyleAlert];
-            [alert addAction:[UIAlertAction actionWithTitle:@"GO" style:UIAlertActionStyleDefault handler:nil]];
-            UIViewController *rootVC = foundWindow.rootViewController;
-            if (rootVC) {
-                [rootVC presentViewController:alert animated:YES completion:nil];
+
+                Debug.DrawLine(new Vector3(redX, redY, redZ), new Vector3(x, y, z), Color.green);
+                Debug.DrawLine(new Vector3(redX, redY, redZ), new Vector3(x, y, z), Color.black);
+                Debug.DrawLine(new Vector3(redX, redY, redZ), new Vector3(x, y, z), Color.blue);
             }
         }
-    });
-}
-
-// 3. Wipe Keychain (Deep Clean)
-void wipeKeychain() {
-    NSArray *secItemClasses = @[(__bridge id)kSecClassGenericPassword,
-                                (__bridge id)kSecClassInternetPassword,
-                                (__bridge id)kSecClassCertificate,
-                                (__bridge id)kSecClassKey,
-                                (__bridge id)kSecClassIdentity];
-    for (id secItemClass in secItemClasses) {
-        NSDictionary *spec = @{(__bridge id)kSecClass: secItemClass};
-        SecItemDelete((__bridge CFDictionaryRef)spec);
     }
 }
 
-// 4. Wipe Cookies & Cache (New Addition)
-void wipeCookiesAndCache() {
-    NSHTTPCookieStorage *storage = [NSHTTPCookieStorage sharedHTTPCookieStorage];
-    for (NSHTTPCookie *cookie in [storage cookies]) {
-        [storage deleteCookie:cookie];
-    }
-    [[NSURLCache sharedURLCache] removeAllCachedResponses];
-}
+[ExecuteInEditMode]
+public class AutoTargetingSystem : MonoBehaviour
+{
+    private GameObject enemyTarget;
 
-// 5. Method Swizzling for UUID
-NSUUID * randomUUID(id self, SEL _cmd) {
-    return getFakeUUID();
-}
-
-// 6. Main Execution (Constructor)
-static void __attribute__((constructor)) initialize(void) {
-    @autoreleasepool {
-        // A. Hide Injection Trace
-        unsetenv("DYLD_INSERT_LIBRARIES");
-        
-        // B. Wipe Clipboard
-        [UIPasteboard generalPasteboard].string = @"";
-        
-        // C. Wipe Data
-        wipeKeychain();
-        wipeCookiesAndCache();
-        [[NSUserDefaults standardUserDefaults] removePersistentDomainForName:[[NSBundle mainBundle] bundleIdentifier]];
-        
-        // D. Hook Device ID
-        Class devCls = objc_getClass("UIDevice");
-        if (devCls) {
-            Method m = class_getInstanceMethod(devCls, @selector(identifierForVendor));
-            if (m) method_setImplementation(m, (IMP)randomUUID);
-        }
-        
-        // E. Hook Advertising ID
-        Class adCls = objc_getClass("ASIdentifierManager");
-        if (adCls) {
-            Method m = class_getInstanceMethod(adCls, @selector(advertisingIdentifier));
-            if (m) method_setImplementation(m, (IMP)randomUUID);
-        }
-        
-        // F. Show Alert
-        showSuccessAlert();
+    void Awake()
+    {
+        enemyTarget = Camera.main.transform.Find("Enemy");
     }
 }
+
+[System.Serializable]
+public class EnemyInfo
+{
+    public string Name { get; set; }
+    public string Damage { get; set; }
+}
+
+[System.Serializable]
+public class EnemyList : List<EnemyInfo>
+{
+}
+
+public static class AIManager
+{
+    [Static][TooltipProvided]
+    public static void AddEnemy(List<EnemyInfo> enemies, GameObject enemyData)
+    {
+        enemies.Add(new EnemyInfo() { Name = "Enemy", Damage = enemyData.tag.ToString(), Tag = enemyData.GetComponent<Tag>()?.name });
+    }
+}
+
+[System.Serializable]
+public class Tag
+{
+    public string name { get; set; }
+}
+
