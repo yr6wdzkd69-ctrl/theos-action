@@ -1,145 +1,18 @@
-using UnityEngine;
-using System.Collections;
+#import <substrate.h>
+#import <mach-o/dyld.h>
 
-public class AIController : MonoBehaviour {
+// Offset Configuration
+static uint64_t TARGET_OFFSET = 0x100080D2; 
 
-    private Camera mainCamera;
-    private Animator animator;
-    private bool isDebugMode = true;
-    public Transform enemyTarget;
+%ctor {
+    // Calculate ASLR slide
+    uint64_t slide = _dyld_get_image_vmaddr_slide(0);
+    uint64_t targetAddress = slide + TARGET_OFFSET;
 
-    void Start () {
-        // Set camera and animator reference points
-        mainCamera = Camera.main;
-        animator = GetComponent<Animator>();
-        if (!animator) {
-            Debug.LogError("No Animator Component Found in the script.");
-            return;
-        }
-        // Enemy Target is set by default to player.
-        enemyTarget = Camera.main.transform.GetChild(0).FindObjectOfType(typeof(Transform)) as GameObject;
-    }
+    // Patch Bytes: MOV X0, 0 (False) + RET (Return)
+    // Hex: 00 00 80 D2 C0 03 5F D6
+    unsigned char patchBytes[] = {0x00, 0x00, 0x80, 0xD2, 0xC0, 0x03, 0x5F, 0xD6};
 
-    void Update() {
-        float maxDistance = Vector3.Distance(transform.position, enemyTarget.transform.position);
-        if (maxDistance > 1.0f)
-        {
-            transform.position = Vector3.MoveTowards(transform.position, enemyTarget.transform.position,
-                Time.deltaTime * 2.0f);                
-        }
-        else
-        {
-            transform.position = Camera.main.transform.GetFirstNearByPoint(transform.position, 1.0f);                  
-        }
-        if (!isDebugMode && !IsGizmoEnabled())
-        {
-            // disable gizmos when game is not in debug mode
-            Debug.DrawLine(transform.position, enemyTarget.transform.position, Color.red);
-        }
-        if (!isDebugMode && IsGizmoEnabled())
-        {
-            // enable gizmos when game is in debug mode
-            Debug.DrawLine(transform.position, enemyTarget.transform.position, Color.green);
-        }
-    }
-
-    void OnMouseDown()
-    {
-        isDebugMode = !isDebugMode; 
-    }
-
-    void OnPointerDragEnd()
-    (
-        Vector3 mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition),
-        Vector3 eyeSpacePos = mainCamera.transform.TransformPoint(mousePosition));
-        float distanceToObject = Vector3.DistBetween(Vector3.zero, eyeSpacePos, Vector3.Distance(Camera.main.transform.position, enemyTarget.transform.position));
-
-        if (distanceToObject <= 1.0f)
-        {
-            Destroy(gameObject);
-        }
-    )
-
-    void ToggleDebugMenu()
-    {
-        isDebugMode = !isDebugMode;
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            StartCoroutine(DrawDebugLines());
-        }
-    }
-
-    IEnumerator DrawDebugLines ()
-    {
-        while (true)
-        {
-            yield return new WaitForSeconds(0.5f);
-            if (isDebugMode)
-            {
-                Color red = Color.red;
-                Vector3 directionFromCamera = Camera.main.transform.InverseTransformDirection(new Vector3(eyeSpacePos.x, -1.0f, eyeSpacePos.z));
-                float angleDelta = Mathf.Abs(Mathf.Cos(directionFromCamera.xAxisAngle) * Mathf.PI / 180.0f);
-                int index = (int)Math.Round(angleDelta);
-                int yCount = (int)index;
-
-                for (int i = 0; i < yCount; ++i)
-                {
-                    float x = 0.0f;
-                    float y = 0.0f;
-                    float z = 0.0f;
-                    float radius = 1.0f;
-                    float colorFactor = 0.2 + 0.4 * i;
-                    float colorRed = Color.red * colorFactor;
-                    float redX = (Color.red * colorFactor) + 0.2;
-                    float redY = (Color.red * colorFactor) + 0.2;
-                    float redZ = (Color.red * colorFactor) + 0.2;
-
-                    Debug.DrawLine(new Vector3(redX, redY, redZ), new Vector3(x, y, z), Color.blue);
-                }
-
-                Debug.DrawLine(new Vector3(redX, redY, redZ), new Vector3(x, y, z), Color.green);
-                Debug.DrawLine(new Vector3(redX, redY, redZ), new Vector3(x, y, z), Color.black);
-                Debug.DrawLine(new Vector3(redX, redY, redZ), new Vector3(x, y, z), Color.blue);
-            }
-        }
-    }
+    // Apply Patch
+    MSHookMemory((void *)targetAddress, patchBytes, sizeof(patchBytes));
 }
-
-[ExecuteInEditMode]
-public class AutoTargetingSystem : MonoBehaviour
-{
-    private GameObject enemyTarget;
-
-    void Awake()
-    {
-        enemyTarget = Camera.main.transform.Find("Enemy");
-    }
-}
-
-[System.Serializable]
-public class EnemyInfo
-{
-    public string Name { get; set; }
-    public string Damage { get; set; }
-}
-
-[System.Serializable]
-public class EnemyList : List<EnemyInfo>
-{
-}
-
-public static class AIManager
-{
-    [Static][TooltipProvided]
-    public static void AddEnemy(List<EnemyInfo> enemies, GameObject enemyData)
-    {
-        enemies.Add(new EnemyInfo() { Name = "Enemy", Damage = enemyData.tag.ToString(), Tag = enemyData.GetComponent<Tag>()?.name });
-    }
-}
-
-[System.Serializable]
-public class Tag
-{
-    public string name { get; set; }
-}
-
