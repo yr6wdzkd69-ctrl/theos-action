@@ -1,15 +1,11 @@
 TARGET := iphone:clang:latest:14.0
 ARCHS = arm64
-DEBUG = 0
-FINALPACKAGE = 1
 
 include $(THEOS)/makefiles/common.mk
 
-TWEAK_NAME = DeviceReset
+TWEAK_NAME = AntiKickSS
 
-DeviceReset_FILES = Tweak.x
-DeviceReset_CFLAGS = -fobjc-arc -Wno-deprecated-declarations -Wno-error
-DeviceReset_LDFLAGS = -Wl,-segalign,0x4000
-DeviceReset_FRAMEWORKS = UIKit Foundation Security AdSupport
+AntiKickSS_FILES = Tweak.x
+AntiKickSS_CFLAGS = -fobjc-arc
 
 include $(THEOS_MAKE_PATH)/tweak.mk
