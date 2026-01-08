@@ -3,10 +3,10 @@ ARCHS = arm64
 
 include $(THEOS)/makefiles/common.mk
 
-TWEAK_NAME = AntiKickSS
+TWEAK_NAME = CoDScopeBot
 
-AntiKickSS_FILES = Tweak.x
-AntiKickSS_FRAMEWORKS = UIKit
-AntiKickSS_CFLAGS = -fobjc-arc
+CoDScopeBot_FILES = Tweak.x
+CoDScopeBot_FRAMEWORKS = UIKit
+CoDScopeBot_CFLAGS = -fobjc-arc -Wno-deprecated-declarations
 
 include $(THEOS_MAKE_PATH)/tweak.mk
