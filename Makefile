@@ -7,6 +7,6 @@ TWEAK_NAME = CoDScopeBot
 
 CoDScopeBot_FILES = Tweak.x
 CoDScopeBot_FRAMEWORKS = UIKit
-CoDScopeBot_CFLAGS = -fobjc-arc -Wno-deprecated-declarations
+CoDScopeBot_CFLAGS = -fobjc-arc -Wno-deprecated-declarations -Wno-unused-variable
 
 include $(THEOS_MAKE_PATH)/tweak.mk
