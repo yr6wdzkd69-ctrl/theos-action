@@ -1,19 +1,16 @@
 #import <substrate.h>
 #import <mach-o/dyld.h>
-#import <vector>
-#import <cmath>
 #import <UIKit/UIKit.h>
+#import <string.h>
 
 // --- Structs ---
 struct Vector3 {
     float x, y, z;
 };
 
-// --- Offsets (Update these if game updates) ---
+// --- Offsets ---
 #define OFF_ZONEKICK      0x1059A2C0
 #define OFF_IS_ADS        0x200EC04
-#define OFF_GET_HEAD      0x1AE3320
-#define OFF_IS_DEAD       0x2140950
 #define OFF_UPDATE        0x1380BA8
 
 // --- Global Variables ---
@@ -22,11 +19,9 @@ void (*old_Update)(void *instance);
 void (*old_ZoneKick)(void *instance, void *arg1);
 
 // --- Function Pointers ---
-bool (*IsADSAiming)(void* player);
-struct Vector3 (*get_HeadPosition)(void* player);
-bool (*IsDead)(void* player);
+bool (*Game_IsADSAiming)(void* player);
 
-// --- Helper Functions ---
+// --- Helper: Find UnityFramework ---
 intptr_t get_unity_slide() {
     uint32_t count = _dyld_image_count();
     for (uint32_t i = 0; i < count; i++) {
@@ -38,57 +33,49 @@ intptr_t get_unity_slide() {
     return _dyld_get_image_vmaddr_slide(0);
 }
 
-// --- Anti-Ban Hook ---
+// --- Hook 1: Anti-Kick ---
 void new_ZoneKick(void *instance, void *arg1) {
-    return; // Returns Void/False to prevent kick
+    return; 
 }
 
-// --- Aimbot Logic Hook ---
+// --- Hook 2: Scope Logic ---
 void new_Update(void *instance) {
-    if (!IsADSAiming) {
-        old_Update(instance);
-        return;
+    if (Game_IsADSAiming != NULL) {
+        bool isScoped = Game_IsADSAiming(instance);
+        if (isScoped) {
+            // Scope active logic here
+        }
     }
-
-    // Scope-Only Check
-    bool isScoped = IsADSAiming(instance);
     
-    if (isScoped) {
-        // [Add Target Selection Logic Here]
-        // Example:
-        // void* target = GetBestTarget();
-        // if(target) { AimAt(target); }
+    if (old_Update) {
+        old_Update(instance);
     }
-
-    old_Update(instance);
 }
 
-// --- Main Constructor ---
+// --- Constructor ---
 %ctor {
     unity_base = get_unity_slide();
     
     if (unity_base) {
-        // Calculate Addresses
         uint64_t addr_ZoneKick = unity_base + OFF_ZONEKICK;
         uint64_t addr_Update   = unity_base + OFF_UPDATE; 
+        uint64_t addr_IsADS    = unity_base + OFF_IS_ADS;
         
-        // Link Pointers
-        IsADSAiming      = (bool (*)(void*))(unity_base + OFF_IS_ADS);
-        get_HeadPosition = (struct Vector3 (*)(void*))(unity_base + OFF_GET_HEAD);
-        IsDead           = (bool (*)(void*))(unity_base + OFF_IS_DEAD);
+        Game_IsADSAiming = (bool (*)(void*))(addr_IsADS);
 
-        // Apply Safe Hooks
         MSHookFunction((void *)addr_ZoneKick, (void *)new_ZoneKick, (void **)&old_ZoneKick);
         MSHookFunction((void *)addr_Update,   (void *)new_Update,   (void **)&old_Update);
     }
     
-    // Activation Alert
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-         UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"System Ready" 
-                                                                        message:@"Scope-Bot & Anti-Kick Active" 
+         UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Activated" 
+                                                                        message:@"Scope-Bot Protected" 
                                                                  preferredStyle:UIAlertControllerStyleAlert];
          [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+         
          UIWindow *w = [[UIApplication sharedApplication] windows].firstObject;
-         [w.rootViewController presentViewController:alert animated:YES completion:nil];
+         if (w && w.rootViewController) {
+             [w.rootViewController presentViewController:alert animated:YES completion:nil];
+         }
     });
 }
