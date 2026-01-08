@@ -26,14 +26,16 @@ uint64_t find_pattern(uint64_t startAddress, uint64_t length, const char* patter
 }
 
 void showOffsetAlert(uint64_t offset) {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    dispatch_async(dispatch_get_main_queue(), ^{
         NSString *message = [NSString stringWithFormat:@"Offset Found: 0x%llX", offset];
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Offset Dumper" 
                                                                        message:message 
                                                                 preferredStyle:UIAlertControllerStyleAlert];
         [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
         
-        UIViewController *topController = [UIApplication sharedApplication].keyWindow.rootViewController;
+        UIWindow *window = [[UIApplication sharedApplication] windows].firstObject;
+        UIViewController *topController = window.rootViewController;
+        
         while (topController.presentedViewController) {
             topController = topController.presentedViewController;
         }
@@ -46,7 +48,7 @@ void showOffsetAlert(uint64_t offset) {
         
         uint64_t slide = _dyld_get_image_vmaddr_slide(0);
         
-        // REPLACE THE BYTES BELOW WITH THE REAL HEX PATTERN
+        // IMPORTANT: Replace bytes below with the real Pattern
         const char* pattern = "\xF0\x03\x1F\x2A\xE1\x03\x00\x94"; 
         const char* mask    = "xxxxxxxx";
         
