@@ -1,42 +1,48 @@
 #import <substrate.h>
+#import <mach-o/dyld.h>
 #import <UIKit/UIKit.h>
+#import <string.h>
 
-// --- اختبار النظام (بدون أوفستات اللعبة) ---
-// هذا الكود يسوي هوك على شاشة الايفون العادية
-// اذا كرش هنا، يعني الحماية تمنع تشغيل اي هاك
+// --- كود المحقق (Scanner) ---
+// لا يوجد هوك هنا. فقط بحث عن العناوين.
 
-// تعريف المؤشر الأصلي
-void (*old_viewDidAppear)(id self, SEL _cmd, BOOL animated);
-
-// الدالة الجديدة
-void new_viewDidAppear(id self, SEL _cmd, BOOL animated) {
-    
-    // تشغيل الدالة الأصلية
-    if (old_viewDidAppear) {
-        old_viewDidAppear(self, _cmd, animated);
-    }
-
-    // عرض رسالة مرة واحدة فقط
-    static bool showedAlert = false;
-    if (!showedAlert) {
-        showedAlert = true;
-        NSLog(@"[ScopeBot] System Hook SUCCESS! No Crash.");
+__attribute__((constructor)) static void initialize() {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"System Test" 
-                                                                       message:@"✅ The Dylib is RUNNING!\nThe Game offsets were the problem." 
+        NSMutableString *debugInfo = [NSMutableString string];
+        [debugInfo appendString:@"Searching for Unity...\n"];
+        
+        bool found = false;
+        uint32_t count = _dyld_image_count();
+        
+        // فحص أول 100 ملف محمل في اللعبة
+        for (uint32_t i = 0; i < count; i++) {
+            const char *cName = _dyld_get_image_name(i);
+            if (cName) {
+                NSString *name = [NSString stringWithUTF8String:cName];
+                
+                // نبحث عن أي شيء يشبه Unity أو اللعبة
+                if ([name containsString:@"Unity"] || [name containsString:@"CallOfDuty"] || [name containsString:@"Framework"]) {
+                    uint64_t slide = _dyld_get_image_vmaddr_slide(i);
+                    [debugInfo appendFormat:@"[%d] %@ -> 0x%llx\n", i, [name lastPathComponent], slide];
+                    found = true;
+                }
+            }
+        }
+        
+        if (!found) {
+            [debugInfo appendString:@"❌ Unity Framework NOT found in list!"];
+        }
+
+        // عرض النتائج في رسالة
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"G-Box Debugger" 
+                                                                       message:debugInfo 
                                                                 preferredStyle:UIAlertControllerStyleAlert];
-        [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+        [alert addAction:[UIAlertAction actionWithTitle:@"Copy & Send" style:UIAlertActionStyleDefault handler:nil]];
         
         UIWindow *w = [[UIApplication sharedApplication] keyWindow];
         if (w && w.rootViewController) {
             [w.rootViewController presentViewController:alert animated:YES completion:nil];
         }
-    }
-}
-
-// البناء
-__attribute__((constructor)) static void initialize() {
-    // هوك على كلاس UIViewController (موجود في كل الايفونات)
-    // لا نستخدم UnityFramework هنا
-    MSHookMessageEx(objc_getClass("UIViewController"), @selector(viewDidAppear:), (IMP)&new_viewDidAppear, (IMP *)&old_viewDidAppear);
+    });
 }
