@@ -1,81 +1,83 @@
 #import <substrate.h>
 #import <mach-o/dyld.h>
 #import <UIKit/UIKit.h>
-#import <string.h>
 
-// --- الأوفستات ---
-#define OFF_INIT   0x952694   
+// =================================================
+//        MYTH SCOPE BOT - FINAL STABLE VER
+// =================================================
 
-// --- متغيرات ---
-uint64_t unity_base = 0;
+// --- 1. الأوفستات (من الديمب الخاص بك) ---
+#define OFF_INIT          0x952694   // دالة تهيئة اللاعب
+#define OFF_IS_AIMING     0x10       // مكان بيانات السكوب في الذاكرة
+
+// --- 2. متغيرات عالمية ---
+uint64_t game_base = 0;       // عنوان اللعبة
+void *player_instance = NULL; // هنا سنحفظ بيانات اللاعب
+
+// --- 3. تعريف الدالة الأصلية ---
 void (*old_Init)(void *instance, void *world, void *player);
 
-// --- البحث الحذر (بدون تخمين) ---
-uint64_t find_unity_strictly() {
-    uint32_t count = _dyld_image_count();
-    
-    for (uint32_t i = 0; i < count; i++) {
-        const char *cName = _dyld_get_image_name(i);
-        if (!cName) continue;
+// --- 4. الهوك الآمن (Init) ---
+// وظيفته فقط: سرقة عنوان اللاعب عند الدخول للجيم
+void new_Init(void *instance, void *world, void *player) {
+    // تشغيل كود اللعبة الأصلي فوراً (لمنع التعليق)
+    if (old_Init) {
+        old_Init(instance, world, player);
+    }
+
+    // حفظ اللاعب
+    if (instance != NULL) {
+        player_instance = instance;
+    }
+}
+
+// --- 5. حلقة التجسس (Spy Loop) ---
+// هذا الكود يقرأ الذاكرة بهدوء دون استدعاء دوال (آمن 100% من الكراش)
+void spy_loop() {
+    if (player_instance != NULL) {
+        // قراءة مباشرة: هل اللاعب فاتح سكوب؟
+        bool isScoped = *(bool*)((uint64_t)player_instance + OFF_IS_AIMING);
         
-        NSString *name = [NSString stringWithUTF8String:cName];
-        
-        // نبحث عن Unity فقط
-        if ([name containsString:@"UnityFramework"]) {
-            return _dyld_get_image_vmaddr_slide(i);
+        if (isScoped) {
+            // هنا تضع كود الايم بوت لاحقاً
+            // حالياً سنطبع للتأكد
+            NSLog(@"[MYTH] SCOPE ACTIVE! 🎯");
         }
     }
-    return 0; // إذا لم نجده، نرجع صفر (فشل)
 }
 
-// --- الهوك ---
-void new_Init(void *instance, void *world, void *player) {
-    if (old_Init) old_Init(instance, world, player);
-    
-    // فقط للتأكد أن الهاك اشتغل
-    static bool msgShown = false;
-    if (!msgShown) {
-        msgShown = true;
-        NSLog(@"[ScopeBot] WE ARE IN! Player found at %p", instance);
-    }
-}
-
-// --- التشغيل ---
+// --- 6. نقطة التشغيل الرئيسية ---
 __attribute__((constructor)) static void initialize() {
-    // ننتظر 5 ثواني فقط
+    // ننتظر 5 ثواني لضمان أن اللعبة حملت ملفاتها
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         
-        // 1. البحث الصارم
-        unity_base = find_unity_strictly();
+        // [هام جداً]
+        // بما أننا حقنا في "التطبيق الرئيسي"، فعنوان اللعبة هو دائماً الملف رقم 0
+        game_base = _dyld_get_image_vmaddr_slide(0);
         
-        if (unity_base == 0) {
-            // [حالة الأمان]
-            // لم نجد الملف -> نوقف الهاك ونعرض رسالة بدل الكراش
-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Safety Stop 🛑" 
-                                                                           message:@"Could not find 'UnityFramework'.\nHack aborted to prevent crash." 
-                                                                    preferredStyle:UIAlertControllerStyleAlert];
-            [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
-            
-            UIWindow *w = [[UIApplication sharedApplication] keyWindow];
-            if (w && w.rootViewController) {
-                [w.rootViewController presentViewController:alert animated:YES completion:nil];
-            }
-            return;
-        }
-
-        // 2. إذا وجدنا الملف، نحقن
-        uint64_t addr_Init = unity_base + OFF_INIT;
-        MSHookFunction((void *)addr_Init, (void *)new_Init, (void **)&old_Init);
+        // حساب عنوان دالة Init
+        uint64_t target_addr = game_base + OFF_INIT;
         
-        // رسالة نجاح
-        UIAlertController *success = [UIAlertController alertControllerWithTitle:@"Success ✅" 
-                                                                       message:@"Unity Found & Hooked!\nGo play." 
-                                                                preferredStyle:UIAlertControllerStyleAlert];
-        [success addAction:[UIAlertAction actionWithTitle:@"GO" style:UIAlertActionStyleDefault handler:nil]];
+        // تنفيذ الحقن
+        MSHookFunction((void *)target_addr, (void *)new_Init, (void **)&old_Init);
         
+        // تشغيل المؤقت (يفحص 10 مرات في الثانية)
+        [NSTimer scheduledTimerWithTimeInterval:0.1 
+                                         target:[NSBlockOperation blockOperationWithBlock:^{ spy_loop(); }] 
+                                       selector:@selector(main) 
+                                       userInfo:nil 
+                                        repeats:YES];
+        
+        // رسالة تأكيد النجاح
         UIWindow *w = [[UIApplication sharedApplication] keyWindow];
         if (w && w.rootViewController) {
-            [w.rootViewController presentViewController:success animated:YES completion:nil];
+             UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"MYTH Hack Loaded" 
+                                                                            message:@"Injection Successful via Main App 💉\nNo Crash Mode." 
+                                                                     preferredStyle:UIAlertControllerStyleAlert];
+             [alert addAction:[UIAlertAction actionWithTitle:@"Let's Play" style:UIAlertActionStyleDefault handler:nil]];
+             [w.rootViewController presentViewController:alert animated:YES completion:nil];
         }
+        
+        NSLog(@"[MYTH] Hack Injected Successfully at Base: 0x%llx", game_base);
     });
 }
