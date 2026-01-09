@@ -5,7 +5,7 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = CoDScopeBot
 
-CoDScopeBot_FILES = Tweak.x
+CoDScopeBot_FILES = Tweak.mm
 CoDScopeBot_FRAMEWORKS = UIKit
 CoDScopeBot_CFLAGS = -fobjc-arc -Wno-deprecated-declarations -Wno-unused-variable
 
