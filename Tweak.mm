@@ -3,21 +3,16 @@
 #import <UIKit/UIKit.h>
 #import <string.h>
 
-// --- إعدادات الهاك ---
-// الأوفستات التي استخرجناها سابقاً
+// --- الأوفستات ---
 #define OFF_INIT   0x952694   
-#define OFFSET_IS_AIMING_FIELD  0x10
 
 // --- متغيرات ---
-uint64_t final_base_address = 0;
-void *myPlayer = NULL;
+uint64_t unity_base = 0;
 void (*old_Init)(void *instance, void *world, void *player);
 
-// --- دالة البحث الذكي (Smart Finder) ---
-// هذه الدالة تبحث عن "الهدف" مهما كان اسمه
-uint64_t get_smart_base_address() {
+// --- البحث الحذر (بدون تخمين) ---
+uint64_t find_unity_strictly() {
     uint32_t count = _dyld_image_count();
-    uint64_t candidate_addr = 0;
     
     for (uint32_t i = 0; i < count; i++) {
         const char *cName = _dyld_get_image_name(i);
@@ -25,81 +20,62 @@ uint64_t get_smart_base_address() {
         
         NSString *name = [NSString stringWithUTF8String:cName];
         
-        // الأولوية 1: UnityFramework (الأكثر دقة)
+        // نبحث عن Unity فقط
         if ([name containsString:@"UnityFramework"]) {
             return _dyld_get_image_vmaddr_slide(i);
         }
-        
-        // الأولوية 2: اسم اللعبة الرئيسي
-        if ([name containsString:@"CallOfDuty"] && !candidate_addr) {
-            candidate_addr = _dyld_get_image_vmaddr_slide(i);
-        }
     }
-    
-    // إذا لم نجد Unity، نستخدم عنوان اللعبة
-    if (candidate_addr != 0) return candidate_addr;
-    
-    // الحل الأخير: الملف رقم 0 (الرئيسي دائماً)
-    return _dyld_get_image_vmaddr_slide(0);
+    return 0; // إذا لم نجده، نرجع صفر (فشل)
 }
 
-// --- الهوك (Init) ---
+// --- الهوك ---
 void new_Init(void *instance, void *world, void *player) {
-    if (instance != NULL) {
-        myPlayer = instance;
-    }
-    if (old_Init) {
-        old_Init(instance, world, player);
-    }
-}
-
-// --- المؤقت (Loop) ---
-void main_loop() {
-    if (myPlayer != NULL) {
-        // قراءة الذاكرة (Memory Read)
-        // لن تسبب كراش إلا إذا كان المؤشر خطأ
-        bool isScoped = *(bool*)((uint64_t)myPlayer + OFFSET_IS_AIMING_FIELD);
-        
-        if (isScoped) {
-            // كود تجريبي: هزاز خفيف عند السكوب للتأكد
-             // UIImpactFeedbackGenerator *gen = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleMedium];
-             // [gen impactOccurred];
-             NSLog(@"[ScopeBot] AIM ACTIVE 🎯");
-        }
+    if (old_Init) old_Init(instance, world, player);
+    
+    // فقط للتأكد أن الهاك اشتغل
+    static bool msgShown = false;
+    if (!msgShown) {
+        msgShown = true;
+        NSLog(@"[ScopeBot] WE ARE IN! Player found at %p", instance);
     }
 }
 
 // --- التشغيل ---
 __attribute__((constructor)) static void initialize() {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(8.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    // ننتظر 5 ثواني فقط
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         
-        // 1. البحث عن العنوان
-        final_base_address = get_smart_base_address();
-        uint64_t target_init_addr = final_base_address + OFF_INIT;
-
-        // 2. رسالة التشخيص (قبل الهوك)
-        // هذه الرسالة ستخبرنا هل العنوان صحيح أم صفر
-        NSString *msg = [NSString stringWithFormat:@"Base: 0x%llx\nTarget Init: 0x%llx\n\nClick OK to Inject.", final_base_address, target_init_addr];
+        // 1. البحث الصارم
+        unity_base = find_unity_strictly();
         
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Smart Injector" 
-                                                                       message:msg 
-                                                                preferredStyle:UIAlertControllerStyleAlert];
-        
-        [alert addAction:[UIAlertAction actionWithTitle:@"INJECT NOW" style:UIAlertActionStyleDestructive handler:^(UIAlertAction * action) {
-            // 3. الحقن يتم فقط بعد ضغط الزر (لتجنب كراش البداية)
-            MSHookFunction((void *)target_init_addr, (void *)new_Init, (void **)&old_Init);
+        if (unity_base == 0) {
+            // [حالة الأمان]
+            // لم نجد الملف -> نوقف الهاك ونعرض رسالة بدل الكراش
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Safety Stop 🛑" 
+                                                                           message:@"Could not find 'UnityFramework'.\nHack aborted to prevent crash." 
+                                                                    preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
             
-            // تشغيل اللوب
-            [NSTimer scheduledTimerWithTimeInterval:0.1 
-                                             target:[NSBlockOperation blockOperationWithBlock:^{ main_loop(); }] 
-                                           selector:@selector(main) 
-                                           userInfo:nil 
-                                            repeats:YES];
-        }]];
+            UIWindow *w = [[UIApplication sharedApplication] keyWindow];
+            if (w && w.rootViewController) {
+                [w.rootViewController presentViewController:alert animated:YES completion:nil];
+            }
+            return;
+        }
+
+        // 2. إذا وجدنا الملف، نحقن
+        uint64_t addr_Init = unity_base + OFF_INIT;
+        MSHookFunction((void *)addr_Init, (void *)new_Init, (void **)&old_Init);
+        
+        // رسالة نجاح
+        UIAlertController *success = [UIAlertController alertControllerWithTitle:@"Success ✅" 
+                                                                       message:@"Unity Found & Hooked!\nGo play." 
+                                                                preferredStyle:UIAlertControllerStyleAlert];
+        [success addAction:[UIAlertAction actionWithTitle:@"GO" style:UIAlertActionStyleDefault handler:nil]];
         
         UIWindow *w = [[UIApplication sharedApplication] keyWindow];
         if (w && w.rootViewController) {
-            [w.rootViewController presentViewController:alert animated:YES completion:nil];
+            [w.rootViewController presentViewController:success animated:YES completion:nil];
         }
     });
 }
