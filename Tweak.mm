@@ -3,7 +3,7 @@
 #import <UIKit/UIKit.h>
 #import <string.h>
 
-// --- Configurable Offsets (UPDATE THESE FROM YOUR DUMP) ---
+// --- Configurable Offsets ---
 #define OFF_ZONEKICK      0x1059A2C0
 #define OFF_IS_ADS        0x200EC04
 #define OFF_UPDATE        0x1380BA8
@@ -28,13 +28,11 @@ intptr_t get_unity_slide() {
 
 // --- Hook 1: Safe Anti-Kick ---
 void new_ZoneKick(void *instance, void *arg1) {
-    // Return immediately to bypass the kick command
     return;
 }
 
 // --- Hook 2: Scope-Only Logic ---
 void new_Update(void *instance) {
-    // Safety Check: Ensure pointer is valid before calling
     if (Game_IsADSAiming != NULL) {
         bool isScoped = Game_IsADSAiming(instance);
         if (isScoped) {
@@ -42,35 +40,31 @@ void new_Update(void *instance) {
         }
     }
     
-    // Call Original Game Loop
     if (old_Update) {
         old_Update(instance);
     }
 }
 
-// --- Main Constructor ---
-%ctor {
-    // Delay execution by 10 seconds to prevent startup crash
+// --- Main Constructor (Fixed for .mm files) ---
+// استبدلنا %ctor بهذا السطر الرسمي عشان يروح الخطأ
+__attribute__((constructor)) static void initialize() {
+    
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         
         unity_base = get_unity_slide();
         
         if (unity_base != 0) {
-            // Calculate Real Addresses
             uint64_t addr_ZoneKick = unity_base + OFF_ZONEKICK;
             uint64_t addr_Update   = unity_base + OFF_UPDATE; 
             uint64_t addr_IsADS    = unity_base + OFF_IS_ADS;
             
-            // Assign Function Pointers
             Game_IsADSAiming = (bool (*)(void*))(addr_IsADS);
 
-            // Apply Hooks Safely
             MSHookFunction((void *)addr_ZoneKick, (void *)new_ZoneKick, (void **)&old_ZoneKick);
             MSHookFunction((void *)addr_Update,   (void *)new_Update,   (void **)&old_Update);
             
-            // Success Alert
             UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"ScopeBot Loaded" 
-                                                                           message:@"Injected Successfully without Crash!" 
+                                                                           message:@"Compiled Successfully! ✅" 
                                                                     preferredStyle:UIAlertControllerStyleAlert];
             [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
             
@@ -78,8 +72,6 @@ void new_Update(void *instance) {
             if (w && w.rootViewController) {
                 [w.rootViewController presentViewController:alert animated:YES completion:nil];
             }
-        } else {
-            NSLog(@"[ScopeBot] Error: UnityFramework not found.");
         }
     });
 }
