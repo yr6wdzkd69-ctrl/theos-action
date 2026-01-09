@@ -3,15 +3,19 @@
 #import <UIKit/UIKit.h>
 #import <string.h>
 
+// --- زيادة وزن الملف (عشان نتأكد أن التحديث وصل) ---
+// هذه السطور فقط لزيادة الحجم وتغيير الـ Checksum
+const char *dummy_data = "SCOPE_BOT_V5_TESTing_SIZE_CHANGE_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
 // --- Offsets ---
-#define OFF_INIT   0x952694   // دالة تهيئة اللاعب (كبيرة وآمنة)
-#define OFFSET_IS_AIMING_FIELD  0x10  // مكان تخزين السكوب في الذاكرة (من الديمب)
+#define OFF_INIT   0x952694   // دالة التهيئة (Init)
+#define OFFSET_IS_AIMING_FIELD  0x10  // مكان السكوب في الذاكرة
 
 // --- Globals ---
 uint64_t unity_base = 0;
-void *myPlayer = NULL; // هنا نحفظ عنوان اللاعب
+void *myPlayer = NULL; 
 
-// --- Original Function Pointer ---
+// --- Original Function ---
 void (*old_Init)(void *instance, void *world, void *player);
 
 // --- Utils ---
@@ -26,68 +30,47 @@ intptr_t get_unity_slide() {
     return _dyld_get_image_vmaddr_slide(0);
 }
 
-// --- The Hook (Init ONLY) ---
-// نستخدم هذه الدالة فقط لمسك اللاعب مرة واحدة عند البداية
+// --- Hook Init ---
 void new_Init(void *instance, void *world, void *player) {
-    
-    // 1. حفظ اللاعب
     if (instance != NULL) {
         myPlayer = instance;
-        NSLog(@"[ScopeBot] Player Captured: %p", instance);
     }
-
-    // 2. تشغيل كود اللعبة الأصلي
     if (old_Init) {
         old_Init(instance, world, player);
     }
 }
 
-// --- The Spy Loop (Timer) ---
-// هذا الكود يقرأ الذاكرة كل جزء من الثانية بدون تدخل في وظائف اللعبة
+// --- Spy Loop ---
 void spy_on_scope() {
     if (myPlayer != NULL) {
-        // قراءة مباشرة من الذاكرة (Direct Memory Read)
-        // هذا السطر مستحيل يسبب كراش دالة لأنه قراءة فقط
+        // قراءة الذاكرة بأمان
         bool isScoped = *(bool*)((uint64_t)myPlayer + OFFSET_IS_AIMING_FIELD);
         
         if (isScoped) {
-            // اللاعب فاتح سكوب الآن!
-            NSLog(@"[ScopeBot] SCOPE IS ON 🎯");
-            
-            // هنا لاحقاً نضع كود الايم بوت
+            NSLog(@"[ScopeBot] SCOPE ACTIVE! 🎯");
         }
     }
 }
 
-// --- Constructor ---
+// --- Main ---
 __attribute__((constructor)) static void initialize() {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         
         unity_base = get_unity_slide();
         
+        // طباعة النص الطويل للتأكد
+        NSLog(@"[ScopeBot] Dummy Data Loaded: %s", dummy_data);
+
         if (unity_base != 0) {
             uint64_t addr_Init = unity_base + OFF_INIT;
             
-            // Hook Init Only
             MSHookFunction((void *)addr_Init, (void *)new_Init, (void **)&old_Init);
             
-            // تشغيل الجاسوس (المؤقت)
-            [NSTimer scheduledTimerWithTimeInterval:0.05 
+            [NSTimer scheduledTimerWithTimeInterval:0.1 
                                              target:[NSBlockOperation blockOperationWithBlock:^{ spy_on_scope(); }] 
                                            selector:@selector(main) 
                                            userInfo:nil 
                                             repeats:YES];
-            
-            // رسالة النجاح
-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"ScopeBot V4" 
-                                                                           message:@"Memory Reader Mode Active 🛡️\nNo Function Hooks on Aiming." 
-                                                                    preferredStyle:UIAlertControllerStyleAlert];
-            [alert addAction:[UIAlertAction actionWithTitle:@"GO" style:UIAlertActionStyleDefault handler:nil]];
-            
-            UIWindow *w = [[UIApplication sharedApplication] keyWindow];
-            if (w && w.rootViewController) {
-                [w.rootViewController presentViewController:alert animated:YES completion:nil];
-            }
         }
     });
 }
