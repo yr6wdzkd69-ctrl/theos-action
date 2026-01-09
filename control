@@ -1,7 +1,7 @@
 Package: com.myth.antikickss
 Name: AntiKickSS
 Depends: mobilesubstrate
-Version: 1.0.6
+Version: 1.1.2
 Architecture: iphoneos-arm
 Description: Anti Kick SS Patch
 Maintainer: MYTH
