@@ -3,18 +3,16 @@
 #import <UIKit/UIKit.h>
 #import <string.h>
 
-// --- Configurable Offsets ---
-#define OFF_ZONEKICK      0x1059A2C0
-#define OFF_IS_ADS        0x200EC04
-#define OFF_UPDATE        0x1380BA8
+// --- Configuration ---
+#define OFF_PLAYER_UPDATE  0x1ADB974
+#define OFF_IS_ADS         0x200EC04
 
-// --- Global Variables ---
+// --- Globals ---
 uint64_t unity_base = 0;
-void (*old_Update)(void *instance);
-void (*old_ZoneKick)(void *instance, void *arg1);
+void (*old_PlayerUpdate)(void *instance);
 bool (*Game_IsADSAiming)(void* player);
 
-// --- Helper: Find UnityFramework Base Address ---
+// --- Utils ---
 intptr_t get_unity_slide() {
     uint32_t count = _dyld_image_count();
     for (uint32_t i = 0; i < count; i++) {
@@ -26,49 +24,43 @@ intptr_t get_unity_slide() {
     return 0;
 }
 
-// --- Hook 1: Safe Anti-Kick ---
-void new_ZoneKick(void *instance, void *arg1) {
-    return;
-}
-
-// --- Hook 2: Scope-Only Logic ---
-void new_Update(void *instance) {
-    if (Game_IsADSAiming != NULL) {
-        bool isScoped = Game_IsADSAiming(instance);
-        if (isScoped) {
-            // Aimbot Logic would go here
-        }
+// --- Hooks ---
+void new_PlayerUpdate(void *instance) {
+    if (old_PlayerUpdate) {
+        old_PlayerUpdate(instance);
     }
+
+    if (instance == NULL || Game_IsADSAiming == NULL) {
+        return;
+    }
+
+    bool isScoped = Game_IsADSAiming(instance);
     
-    if (old_Update) {
-        old_Update(instance);
+    if (isScoped) {
+        // Aimbot logic will be placed here
     }
 }
 
-// --- Main Constructor (Fixed for .mm files) ---
-// استبدلنا %ctor بهذا السطر الرسمي عشان يروح الخطأ
+// --- Constructor ---
 __attribute__((constructor)) static void initialize() {
-    
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         
         unity_base = get_unity_slide();
         
         if (unity_base != 0) {
-            uint64_t addr_ZoneKick = unity_base + OFF_ZONEKICK;
-            uint64_t addr_Update   = unity_base + OFF_UPDATE; 
-            uint64_t addr_IsADS    = unity_base + OFF_IS_ADS;
+            uint64_t addr_Update = unity_base + OFF_PLAYER_UPDATE;
+            uint64_t addr_IsADS  = unity_base + OFF_IS_ADS;
             
             Game_IsADSAiming = (bool (*)(void*))(addr_IsADS);
 
-            MSHookFunction((void *)addr_ZoneKick, (void *)new_ZoneKick, (void **)&old_ZoneKick);
-            MSHookFunction((void *)addr_Update,   (void *)new_Update,   (void **)&old_Update);
+            MSHookFunction((void *)addr_Update, (void *)new_PlayerUpdate, (void **)&old_PlayerUpdate);
             
-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"ScopeBot Loaded" 
-                                                                           message:@"Compiled Successfully! ✅" 
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"ScopeBot" 
+                                                                           message:@"Active & Safe" 
                                                                     preferredStyle:UIAlertControllerStyleAlert];
             [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
             
-            UIWindow *w = [[UIApplication sharedApplication] windows].firstObject;
+            UIWindow *w = [[UIApplication sharedApplication] keyWindow];
             if (w && w.rootViewController) {
                 [w.rootViewController presentViewController:alert animated:YES completion:nil];
             }
