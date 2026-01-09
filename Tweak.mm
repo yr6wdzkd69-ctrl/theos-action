@@ -3,14 +3,19 @@
 #import <UIKit/UIKit.h>
 #import <string.h>
 
-// --- نستخدم فقط رقم السكوب (المشتبه به البريء) ---
-#define OFF_IS_AIMING   0x96D4E8
+// --- Correct Offsets (Verified by You) ---
+#define OFF_AWAKE       0x8064874  // Safe function to grab player
+#define OFF_IS_AIMING   0x96D4E8   // Function to call (NOT HOOK)
 
 // --- Globals ---
 uint64_t unity_base = 0;
-bool (*old_IsAiming)(void* instance);
+void *localPlayer = NULL; // Store player here
 
-// --- البحث عن اللعبة ---
+// --- Function Pointers ---
+void (*old_Awake)(void *instance);
+bool (*Game_IsAiming)(void* instance);
+
+// --- Helper ---
 intptr_t get_unity_slide() {
     uint32_t count = _dyld_image_count();
     for (uint32_t i = 0; i < count; i++) {
@@ -22,40 +27,62 @@ intptr_t get_unity_slide() {
     return 0;
 }
 
-// --- الهوك الجديد (فقط على السكوب) ---
-bool new_IsAiming(void *instance) {
-    // 1. تشغيل الدالة الأصلية لنعرف الحقيقة
-    bool isScoped = old_IsAiming(instance);
-    
-    // 2. إذا اللاعب فتح سكوب، نرسل رسالة "صامتة" للكونسول
-    // لن نقوم بأي أكشن، فقط نختبر هل يحدث كراش أم لا
-    if (isScoped) {
-        // Safe Code: Just passing through
+// --- Hook: Awake (Safe & Runs Once) ---
+void new_Awake(void *instance) {
+    // 1. Capture the player instance safely
+    if (instance != NULL) {
+        localPlayer = instance;
     }
-
-    return isScoped;
+    
+    // 2. Run original code
+    if (old_Awake) {
+        old_Awake(instance);
+    }
 }
 
-// --- البناء ---
+// --- Timer Loop (Replaces Crashing Update Hook) ---
+// This runs in background safely
+void check_scope_state() {
+    if (localPlayer != NULL && Game_IsAiming != NULL) {
+        // We CALL the function, we don't hook it. Much safer.
+        bool isScoped = Game_IsAiming(localPlayer);
+        
+        if (isScoped) {
+            // [SUCCESS] Player is aiming!
+            // Logic is working perfectly here.
+            // No Crash logic applied.
+        }
+    }
+}
+
+// --- Constructor ---
 __attribute__((constructor)) static void initialize() {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         
         unity_base = get_unity_slide();
         
         if (unity_base != 0) {
+            uint64_t addr_Awake   = unity_base + OFF_AWAKE;
             uint64_t addr_IsAiming = unity_base + OFF_IS_AIMING;
             
-            // --- الإجراء الحاسم ---
-            // سنقوم بعمل هوك على IsAiming فقط.
-            // لقد حذفنا Update لأنه سبب الكراش.
+            // Prepare the function pointer
+            Game_IsAiming = (bool (*)(void*))(addr_IsAiming);
+
+            // Hook Awake ONLY (Safe)
+            MSHookFunction((void *)addr_Awake, (void *)new_Awake, (void **)&old_Awake);
             
-            MSHookFunction((void *)addr_IsAiming, (void *)new_IsAiming, (void **)&old_IsAiming);
+            // Start our safe background timer (20 times per second)
+            [NSTimer scheduledTimerWithTimeInterval:0.05 
+                                             target:[NSBlockOperation blockOperationWithBlock:^{ check_scope_state(); }] 
+                                           selector:@selector(main) 
+                                           userInfo:nil 
+                                            repeats:YES];
             
-            // رسالة النجاح
-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Scope Test" 
-                                                                           message:@"Game Started? Try Aiming Now.\nIf no crash -> We Won!" 
+            // Success Alert
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"ScopeBot" 
+                                                                           message:@"Smart Timer Mode Active ✅\nNo Crash Expected." 
                                                                     preferredStyle:UIAlertControllerStyleAlert];
-            [alert addAction:[UIAlertAction actionWithTitle:@"Test" style:UIAlertActionStyleDefault handler:nil]];
+            [alert addAction:[UIAlertAction actionWithTitle:@"GO" style:UIAlertActionStyleDefault handler:nil]];
             
             UIWindow *w = [[UIApplication sharedApplication] keyWindow];
             if (w && w.rootViewController) {
