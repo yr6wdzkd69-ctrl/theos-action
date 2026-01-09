@@ -2,82 +2,71 @@
 #import <mach-o/dyld.h>
 #import <UIKit/UIKit.h>
 
-// =================================================
-//        MYTH SCOPE BOT - FINAL STABLE VER
-// =================================================
+// --- إعدادات G-Box الخاصة ---
+// بما أننا نحقن في G-Box، العنوان الأساسي هو دائماً (Image 0)
+// الأوفستات:
+#define OFF_INIT          0x952694
+#define OFF_IS_AIMING     0x10
 
-// --- 1. الأوفستات (من الديمب الخاص بك) ---
-#define OFF_INIT          0x952694   // دالة تهيئة اللاعب
-#define OFF_IS_AIMING     0x10       // مكان بيانات السكوب في الذاكرة
-
-// --- 2. متغيرات عالمية ---
-uint64_t game_base = 0;       // عنوان اللعبة
-void *player_instance = NULL; // هنا سنحفظ بيانات اللاعب
-
-// --- 3. تعريف الدالة الأصلية ---
+// --- متغيرات ---
+uint64_t base_address = 0;
+void *current_player = NULL;
 void (*old_Init)(void *instance, void *world, void *player);
 
-// --- 4. الهوك الآمن (Init) ---
-// وظيفته فقط: سرقة عنوان اللاعب عند الدخول للجيم
+// --- الهوك (Init) ---
 void new_Init(void *instance, void *world, void *player) {
-    // تشغيل كود اللعبة الأصلي فوراً (لمنع التعليق)
+    // 1. تشغيل الأصلي فوراً (عشان ما تعلق اللعبة)
     if (old_Init) {
         old_Init(instance, world, player);
     }
-
-    // حفظ اللاعب
+    
+    // 2. صيد اللاعب
     if (instance != NULL) {
-        player_instance = instance;
+        current_player = instance;
     }
 }
 
-// --- 5. حلقة التجسس (Spy Loop) ---
-// هذا الكود يقرأ الذاكرة بهدوء دون استدعاء دوال (آمن 100% من الكراش)
-void spy_loop() {
-    if (player_instance != NULL) {
-        // قراءة مباشرة: هل اللاعب فاتح سكوب؟
-        bool isScoped = *(bool*)((uint64_t)player_instance + OFF_IS_AIMING);
+// --- المؤقت (الجاسوس) ---
+void gbox_spy_loop() {
+    if (current_player != NULL) {
+        // قراءة الذاكرة
+        bool isScoped = *(bool*)((uint64_t)current_player + OFF_IS_AIMING);
         
         if (isScoped) {
-            // هنا تضع كود الايم بوت لاحقاً
-            // حالياً سنطبع للتأكد
-            NSLog(@"[MYTH] SCOPE ACTIVE! 🎯");
+            NSLog(@"[G-Box Hack] Scope ACTIVE 🎯");
         }
     }
 }
 
-// --- 6. نقطة التشغيل الرئيسية ---
+// --- التشغيل ---
 __attribute__((constructor)) static void initialize() {
-    // ننتظر 5 ثواني لضمان أن اللعبة حملت ملفاتها
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    // تأخير 7 ثواني (ضروري في G-Box لأن تحميله أبطأ)
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(7.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         
-        // [هام جداً]
-        // بما أننا حقنا في "التطبيق الرئيسي"، فعنوان اللعبة هو دائماً الملف رقم 0
-        game_base = _dyld_get_image_vmaddr_slide(0);
+        // 1. سحب عنوان اللعبة مباشرة
+        base_address = _dyld_get_image_vmaddr_slide(0);
         
-        // حساب عنوان دالة Init
-        uint64_t target_addr = game_base + OFF_INIT;
+        // 2. حساب مكان الحقن
+        uint64_t target = base_address + OFF_INIT;
         
-        // تنفيذ الحقن
-        MSHookFunction((void *)target_addr, (void *)new_Init, (void **)&old_Init);
+        // 3. الحقن
+        MSHookFunction((void *)target, (void *)new_Init, (void **)&old_Init);
         
-        // تشغيل المؤقت (يفحص 10 مرات في الثانية)
+        // 4. تشغيل اللوب
         [NSTimer scheduledTimerWithTimeInterval:0.1 
-                                         target:[NSBlockOperation blockOperationWithBlock:^{ spy_loop(); }] 
+                                         target:[NSBlockOperation blockOperationWithBlock:^{ gbox_spy_loop(); }] 
                                        selector:@selector(main) 
                                        userInfo:nil 
                                         repeats:YES];
         
-        // رسالة تأكيد النجاح
+        // رسالة تأكيد
         UIWindow *w = [[UIApplication sharedApplication] keyWindow];
         if (w && w.rootViewController) {
-             UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"MYTH Hack Loaded" 
-                                                                            message:@"Injection Successful via Main App 💉\nNo Crash Mode." 
+             UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"G-Box Mode" 
+                                                                            message:@"✅ Hooked Image [0] Successfully." 
                                                                      preferredStyle:UIAlertControllerStyleAlert];
-             [alert addAction:[UIAlertAction actionWithTitle:@"Let's Play" style:UIAlertActionStyleDefault handler:nil]];
+             [alert addAction:[UIAlertAction actionWithTitle:@"Play" style:UIAlertActionStyleDefault handler:nil]];
              [w.rootViewController presentViewController:alert animated:YES completion:nil];
         }
-        
-        NSLog(@"[MYTH] Hack Injected Successfully at Base: 0x%llx", game_base);
     });
 }
