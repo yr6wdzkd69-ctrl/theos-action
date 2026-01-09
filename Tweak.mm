@@ -1,67 +1,84 @@
 #import <substrate.h>
 #import <mach-o/dyld.h>
-#import <mach-o/getsect.h>
 #import <UIKit/UIKit.h>
-#import <string.h>
+
+// --- الإعدادات ---
+#define OLD_OFFSET      0x952694   // الأوفست القديم
+#define SEARCH_RANGE    0x50000    // نطاق البحث (حوالي 300 كيلوبايت)
+
+// --- بصمة بداية الدالة (ARM64 Prologue) ---
+// STP X29, X30, [SP, #-0x10]!
+// Hex: FD 7B BB A9
+const uint8_t FUNC_START[] = { 0xFD, 0x7B, 0xBB, 0xA9 };
 
 // --- متغيرات ---
 uint64_t game_base = 0;
+void *player_instance = NULL;
+void (*old_Init)(void *instance, void *world, void *player);
 
-// --- ماسح النصوص (The String Hunter) ---
-// هذا الكود يبحث عن كلمة "IsAiming" داخل ملفات اللعبة
-// المنطقة هذه (TEXT, cstring) قابلة للقراءة 100% ولا تسبب كراش
-void scan_for_strings() {
+// --- الهوك ---
+void new_Init(void *instance, void *world, void *player) {
+    if (old_Init) old_Init(instance, world, player);
+    
+    if (instance != NULL) {
+        player_instance = instance;
+        NSLog(@"[MYTH] Player Captured via Neighbor Scan!");
+    }
+}
+
+// --- ماسح الجيران ---
+void scan_neighborhood() {
     game_base = _dyld_get_image_vmaddr_slide(0);
     
-    // الحصول على رأس الملف
-    const struct mach_header_64 *header = (const struct mach_header_64 *)_dyld_get_image_header(0);
+    // نقطة البداية (العنوان القديم)
+    uint64_t start_point = game_base + OLD_OFFSET;
     
-    // البحث عن قسم النصوص (__cstring)
-    unsigned long size = 0;
-    uint8_t *ptr = getsectiondata(header, "__TEXT", "__cstring", &size);
+    // حدود البحث (نرجع للخلف ونقدم للأمام)
+    uint64_t search_start = start_point - (SEARCH_RANGE / 2);
+    uint64_t search_end   = start_point + (SEARCH_RANGE / 2);
     
-    if (ptr == NULL) {
-        // محاولة ثانية مع قسم const
-        ptr = getsectiondata(header, "__TEXT", "__const", &size);
-    }
+    NSLog(@"[MYTH] Scanning around 0x%llx...", start_point);
 
-    if (ptr == NULL) {
-        NSLog(@"[MYTH] Could not find String section.");
-        return;
-    }
+    uint64_t found_addr = 0;
+    uint8_t *ptr = (uint8_t *)search_start;
 
-    NSLog(@"[MYTH] Scanning String Section (Size: %lu)...", size);
+    // الحلقة
+    for (uint64_t i = 0; i < SEARCH_RANGE; i += 4) {
+        // هل وجدنا بداية دالة؟
+        if (memcmp(ptr + i, FUNC_START, sizeof(FUNC_START)) == 0) {
+            
+            uint64_t candidate = (uint64_t)(ptr + i);
+            
+            // فلتر بسيط: نستبعد العنوان القديم نفسه لأنه يكرش
+            if (candidate == start_point) continue;
 
-    // الكلمة التي نبحث عنها
-    const char *target = "get_IsAiming";
-    size_t target_len = strlen(target);
-
-    uint64_t found_at = 0;
-
-    // بداية البحث
-    for (size_t i = 0; i < size - target_len; i++) {
-        if (memcmp(ptr + i, target, target_len) == 0) {
-            found_at = (uint64_t)(ptr + i);
-            break; // وجدناها!
+            found_addr = candidate;
+            break; // وجدنا أقرب جار!
         }
     }
 
-    // عرض النتيجة
+    // النتائج
     dispatch_async(dispatch_get_main_queue(), ^{
         UIWindow *w = [[UIApplication sharedApplication] keyWindow];
         if (w && w.rootViewController) {
-            if (found_at != 0) {
-                // نجاح!
-                NSString *msg = [NSString stringWithFormat:@"STRING FOUND!\nText At: 0x%llx\nOffset: 0x%llx\n\nTake a screenshot!", found_at, found_at - game_base];
-                UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"✅ WE FOUND IT" 
+            if (found_addr != 0) {
+                // وجدنا عنوان جديد!
+                uint64_t new_offset = found_addr - game_base;
+                
+                // نحاول الحقن
+                MSHookFunction((void *)found_addr, (void *)new_Init, (void **)&old_Init);
+                
+                NSString *msg = [NSString stringWithFormat:@"NEW OFFSET FOUND!\nOld: 0x%X\nNew: 0x%llx\nDiff: %lld bytes", OLD_OFFSET, new_offset, new_offset - OLD_OFFSET];
+                UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"🎯 BINGO" 
                                                                                message:msg 
                                                                         preferredStyle:UIAlertControllerStyleAlert];
-                [alert addAction:[UIAlertAction actionWithTitle:@"Send Pic" style:UIAlertActionStyleDefault handler:nil]];
+                [alert addAction:[UIAlertAction actionWithTitle:@"Play" style:UIAlertActionStyleDefault handler:nil]];
                 [w.rootViewController presentViewController:alert animated:YES completion:nil];
+                
             } else {
-                // فشل
-                UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Not Found" 
-                                                                               message:@"The text 'get_IsAiming' is hidden or encrypted." 
+                // لم نجد شيئاً
+                UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Failed" 
+                                                                               message:@"No function found nearby.\nThe code moved too far." 
                                                                         preferredStyle:UIAlertControllerStyleAlert];
                 [alert addAction:[UIAlertAction actionWithTitle:@"Close" style:UIAlertActionStyleDefault handler:nil]];
                 [w.rootViewController presentViewController:alert animated:YES completion:nil];
@@ -71,11 +88,9 @@ void scan_for_strings() {
 }
 
 __attribute__((constructor)) static void initialize() {
-    // ننتظر 10 ثواني
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        // تشغيل البحث في الخلفية
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(8.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-            scan_for_strings();
+            scan_neighborhood();
         });
     });
 }
