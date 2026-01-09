@@ -3,19 +3,18 @@
 #import <UIKit/UIKit.h>
 #import <string.h>
 
-// --- Correct Offsets (Verified by You) ---
-#define OFF_AWAKE       0x8064874  // Safe function to grab player
-#define OFF_IS_AIMING   0x96D4E8   // Function to call (NOT HOOK)
+// --- OFFSETS FROM YOUR DUMP (A2DPlayerSkillInput) ---
+#define OFF_CHECK_INPUT  0x9528D8   // The Loop
+#define OFF_IS_AIMING    0x96D4E8   // The Trigger
 
 // --- Globals ---
 uint64_t unity_base = 0;
-void *localPlayer = NULL; // Store player here
 
 // --- Function Pointers ---
-void (*old_Awake)(void *instance);
-bool (*Game_IsAiming)(void* instance);
+void (*old_CheckSkillInput)(void *instance);
+bool (*Game_get_IsAiming)(void *instance);
 
-// --- Helper ---
+// --- Utils ---
 intptr_t get_unity_slide() {
     uint32_t count = _dyld_image_count();
     for (uint32_t i = 0; i < count; i++) {
@@ -27,30 +26,26 @@ intptr_t get_unity_slide() {
     return 0;
 }
 
-// --- Hook: Awake (Safe & Runs Once) ---
-void new_Awake(void *instance) {
-    // 1. Capture the player instance safely
-    if (instance != NULL) {
-        localPlayer = instance;
+// --- The Safe Hook ---
+void new_CheckSkillInput(void *instance) {
+    // 1. Run Original Game Logic First
+    if (old_CheckSkillInput) {
+        old_CheckSkillInput(instance);
     }
-    
-    // 2. Run original code
-    if (old_Awake) {
-        old_Awake(instance);
-    }
-}
 
-// --- Timer Loop (Replaces Crashing Update Hook) ---
-// This runs in background safely
-void check_scope_state() {
-    if (localPlayer != NULL && Game_IsAiming != NULL) {
-        // We CALL the function, we don't hook it. Much safer.
-        bool isScoped = Game_IsAiming(localPlayer);
+    // 2. Safety Check (Prevent Crash)
+    if (instance == NULL) {
+        return;
+    }
+
+    // 3. Check Scope (Using the correct class function)
+    if (Game_get_IsAiming != NULL) {
+        bool isAiming = Game_get_IsAiming(instance);
         
-        if (isScoped) {
-            // [SUCCESS] Player is aiming!
-            // Logic is working perfectly here.
-            // No Crash logic applied.
+        if (isAiming) {
+            // [SCOPE DETECTED]
+            // Since we are here without crash, the code works!
+            // Future: Add Aimbot Logic Here.
         }
     }
 }
@@ -62,27 +57,21 @@ __attribute__((constructor)) static void initialize() {
         unity_base = get_unity_slide();
         
         if (unity_base != 0) {
-            uint64_t addr_Awake   = unity_base + OFF_AWAKE;
-            uint64_t addr_IsAiming = unity_base + OFF_IS_AIMING;
+            // Calculate Real Addresses
+            uint64_t addr_CheckInput = unity_base + OFF_CHECK_INPUT;
+            uint64_t addr_IsAiming   = unity_base + OFF_IS_AIMING;
             
-            // Prepare the function pointer
-            Game_IsAiming = (bool (*)(void*))(addr_IsAiming);
+            // Link Helper Function
+            Game_get_IsAiming = (bool (*)(void*))(addr_IsAiming);
 
-            // Hook Awake ONLY (Safe)
-            MSHookFunction((void *)addr_Awake, (void *)new_Awake, (void **)&old_Awake);
+            // Apply The Hook
+            MSHookFunction((void *)addr_CheckInput, (void *)new_CheckSkillInput, (void **)&old_CheckSkillInput);
             
-            // Start our safe background timer (20 times per second)
-            [NSTimer scheduledTimerWithTimeInterval:0.05 
-                                             target:[NSBlockOperation blockOperationWithBlock:^{ check_scope_state(); }] 
-                                           selector:@selector(main) 
-                                           userInfo:nil 
-                                            repeats:YES];
-            
-            // Success Alert
+            // Success Message
             UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"ScopeBot" 
-                                                                           message:@"Smart Timer Mode Active ✅\nNo Crash Expected." 
+                                                                           message:@"Injected into A2DPlayerSkillInput ✅\nNo Crash Expected!" 
                                                                     preferredStyle:UIAlertControllerStyleAlert];
-            [alert addAction:[UIAlertAction actionWithTitle:@"GO" style:UIAlertActionStyleDefault handler:nil]];
+            [alert addAction:[UIAlertAction actionWithTitle:@"Let's Go" style:UIAlertActionStyleDefault handler:nil]];
             
             UIWindow *w = [[UIApplication sharedApplication] keyWindow];
             if (w && w.rootViewController) {
