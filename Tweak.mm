@@ -3,92 +3,86 @@
 #import <UIKit/UIKit.h>
 #import <string.h>
 
-// --- الأرقام المستخرجة من الديمب الخاص بك ---
-#define OFF_INIT        0x952694   // دالة التشغيل (كبيرة وآمنة)
-#define OFF_IS_AIMING   0x96D4E8   // دالة الفحص (سنقوم باستدعائها فقط)
+// --- Offsets ---
+#define OFF_INIT   0x952694   // دالة تهيئة اللاعب (كبيرة وآمنة)
+#define OFFSET_IS_AIMING_FIELD  0x10  // مكان تخزين السكوب في الذاكرة (من الديمب)
 
-// --- متغيرات عالمية ---
+// --- Globals ---
 uint64_t unity_base = 0;
-void *myPlayerInstance = NULL; // هنا سنحفظ اللاعب
+void *myPlayer = NULL; // هنا نحفظ عنوان اللاعب
 
-// --- تعريف الدوال ---
-// الدالة الأصلية لـ Init
+// --- Original Function Pointer ---
 void (*old_Init)(void *instance, void *world, void *player);
 
-// دالة السكوب (لن نقوم بعمل هوك عليها، فقط سنناديها)
-bool (*Game_get_IsAiming)(void *instance);
-
-// --- البحث عن ملف Unity ---
+// --- Utils ---
 intptr_t get_unity_slide() {
     uint32_t count = _dyld_image_count();
     for (uint32_t i = 0; i < count; i++) {
         const char *name = _dyld_get_image_name(i);
-        // نبحث عن UnityFramework، وإذا لم نجدها نجرب الملف الرئيسي
         if (name && (strstr(name, "UnityFramework") || strstr(name, "CallOfDuty"))) {
             return _dyld_get_image_vmaddr_slide(i);
         }
     }
-    return _dyld_get_image_vmaddr_slide(0); // الخطة البديلة
+    return _dyld_get_image_vmaddr_slide(0);
 }
 
-// --- الهوك الآمن (Init) ---
+// --- The Hook (Init ONLY) ---
+// نستخدم هذه الدالة فقط لمسك اللاعب مرة واحدة عند البداية
 void new_Init(void *instance, void *world, void *player) {
-    // 1. نشغل كود اللعبة الأصلي أولاً (عشان ما تخرب اللعبة)
+    
+    // 1. حفظ اللاعب
+    if (instance != NULL) {
+        myPlayer = instance;
+        NSLog(@"[ScopeBot] Player Captured: %p", instance);
+    }
+
+    // 2. تشغيل كود اللعبة الأصلي
     if (old_Init) {
         old_Init(instance, world, player);
     }
-
-    // 2. نسرق عنوان اللاعب ونحفظه عندنا
-    if (instance != NULL) {
-        myPlayerInstance = instance;
-        NSLog(@"[ScopeBot] Player Instance Captured: %p", instance);
-    }
 }
 
-// --- المؤقت الخارجي (Timer) ---
-// هذا الكود يشتغل في الخلفية ولا يسبب كراش
-void check_scope_loop() {
-    if (myPlayerInstance != NULL && Game_get_IsAiming != NULL) {
-        // ننادي دالة السكوب بأمان
-        bool isScoped = Game_get_IsAiming(myPlayerInstance);
+// --- The Spy Loop (Timer) ---
+// هذا الكود يقرأ الذاكرة كل جزء من الثانية بدون تدخل في وظائف اللعبة
+void spy_on_scope() {
+    if (myPlayer != NULL) {
+        // قراءة مباشرة من الذاكرة (Direct Memory Read)
+        // هذا السطر مستحيل يسبب كراش دالة لأنه قراءة فقط
+        bool isScoped = *(bool*)((uint64_t)myPlayer + OFFSET_IS_AIMING_FIELD);
         
         if (isScoped) {
-            // هنا يشتغل الهاك!
-            // حالياً فقط سنطبع رسالة للتأكد
-             NSLog(@"[ScopeBot] SCOPE IS ON! 🎯");
+            // اللاعب فاتح سكوب الآن!
+            NSLog(@"[ScopeBot] SCOPE IS ON 🎯");
+            
+            // هنا لاحقاً نضع كود الايم بوت
         }
     }
 }
 
-// --- بداية التشغيل ---
+// --- Constructor ---
 __attribute__((constructor)) static void initialize() {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         
         unity_base = get_unity_slide();
         
         if (unity_base != 0) {
-            // حساب العناوين
-            uint64_t addr_Init     = unity_base + OFF_INIT;
-            uint64_t addr_IsAiming = unity_base + OFF_IS_AIMING;
+            uint64_t addr_Init = unity_base + OFF_INIT;
             
-            // تجهيز دالة السكوب (بدون هوك)
-            Game_get_IsAiming = (bool (*)(void*))(addr_IsAiming);
-
-            // عمل هوك على Init فقط
+            // Hook Init Only
             MSHookFunction((void *)addr_Init, (void *)new_Init, (void **)&old_Init);
             
-            // تشغيل المؤقت (يفحص 10 مرات في الثانية)
-            [NSTimer scheduledTimerWithTimeInterval:0.1 
-                                             target:[NSBlockOperation blockOperationWithBlock:^{ check_scope_loop(); }] 
+            // تشغيل الجاسوس (المؤقت)
+            [NSTimer scheduledTimerWithTimeInterval:0.05 
+                                             target:[NSBlockOperation blockOperationWithBlock:^{ spy_on_scope(); }] 
                                            selector:@selector(main) 
                                            userInfo:nil 
                                             repeats:YES];
             
             // رسالة النجاح
-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"ScopeBot V3" 
-                                                                           message:@"Hooked 'Init' Successfully.\nGo into a match to activate." 
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"ScopeBot V4" 
+                                                                           message:@"Memory Reader Mode Active 🛡️\nNo Function Hooks on Aiming." 
                                                                     preferredStyle:UIAlertControllerStyleAlert];
-            [alert addAction:[UIAlertAction actionWithTitle:@"Play" style:UIAlertActionStyleDefault handler:nil]];
+            [alert addAction:[UIAlertAction actionWithTitle:@"GO" style:UIAlertActionStyleDefault handler:nil]];
             
             UIWindow *w = [[UIApplication sharedApplication] keyWindow];
             if (w && w.rootViewController) {
