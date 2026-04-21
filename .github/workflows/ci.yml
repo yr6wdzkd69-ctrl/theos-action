@@ -17,10 +17,13 @@ jobs:
 
       - name: Build Package
         run: |
+          # بناء المشروع كحزمة نهائية
           make package FINALPACKAGE=1
         
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: CODM-Tweak
-          path: "packages/*.deb"
+          name: AntiReport-Dylib
+          # التعديل هنا: سحب ملف الـ dylib من مجلد الـ .theos المخفي
+          path: .theos/obj/debug/*.dylib
+
