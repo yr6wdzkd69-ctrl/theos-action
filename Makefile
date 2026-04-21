@@ -1,12 +1,11 @@
-TARGET := iphone:clang:latest:14.0
-ARCHS = arm64
+# دعم معالج A13 (arm64e)
+ARCHS = arm64 arm64e
+TARGET = iphone:clang:latest:13.0
 
 include $(THEOS)/makefiles/common.mk
 
-TWEAK_NAME = CoDScopeBot
+TWEAK_NAME = AntiReport
+AntiReport_FILES = Tweak.x
+AntiReport_CFLAGS = -fobjc-arc
 
-CoDScopeBot_FILES = Tweak.mm
-CoDScopeBot_FRAMEWORKS = UIKit
-CoDScopeBot_CFLAGS = -fobjc-arc -Wno-deprecated-declarations -Wno-unused-variable -Wno-unused-function
-
-include $(THEOS_MAKE_PATH)/tweak.mk
+include $(THEOS)/makefiles/tweak.mk
