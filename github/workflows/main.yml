@@ -1,0 +1,26 @@
+name: CI
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Prepare Theos
+        uses: Randomblock1/theos-action@v1
+
+      - name: Build Package
+        run: |
+          make package FINALPACKAGE=1
+        
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AntiReport-Dylib
+          path: .theos/obj/debug/*.dylib
